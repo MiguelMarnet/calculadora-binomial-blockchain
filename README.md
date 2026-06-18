@@ -63,4 +63,4 @@ As funções do contrato são `pure` (apenas leem e retornam valores), então **
 
 ## 👤 Autor
 
-**[Seu nome]** — [seu e-mail ou LinkedIn]
+**Miguel Marnet**
