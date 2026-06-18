@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calculadora Binomial · on-chain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1525;
+    --bg-grid:rgba(120,140,180,.05);
+    --surface:#161f33;
+    --surface-2:#1d2840;
+    --line:#28344f;
+    --ink:#e8ecf5;
+    --muted:#7c8baa;
+    --gold:#f4b740;        /* resultado · casa ativa */
+    --gold-soft:rgba(244,183,64,.14);
+    --teal:#4ed6c4;        /* conexão · links do triângulo */
+    --red:#ff6b6b;
+    --display:"Space Grotesk",system-ui,sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; min-height:100vh; color:var(--ink); font-family:var(--display);
+    background:
+      linear-gradient(var(--bg-grid) 1px,transparent 1px) 0 0/26px 26px,
+      linear-gradient(90deg,var(--bg-grid) 1px,transparent 1px) 0 0/26px 26px,
+      radial-gradient(1200px 600px at 80% -10%,rgba(78,214,196,.06),transparent 60%),
+      var(--bg);
+    line-height:1.5;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 64px}
+
+  /* ---------- header ---------- */
+  header{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;justify-content:space-between;
+    padding-bottom:20px;border-bottom:1px solid var(--line)}
+  .brand .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.28em;text-transform:uppercase;
+    color:var(--teal);margin:0 0 6px}
+  .brand h1{font-size:clamp(26px,4vw,40px);font-weight:700;margin:0;letter-spacing:-.02em}
+  .brand h1 b{color:var(--gold);font-weight:700}
+  .conn{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+  button.connect{
+    font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.02em;
+    background:var(--teal);color:#06241f;border:0;border-radius:9px;padding:11px 16px;cursor:pointer;
+    transition:transform .12s ease,filter .12s ease}
+  button.connect:hover{filter:brightness(1.08)}
+  button.connect:active{transform:translateY(1px)}
+  .status{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#445; flex:none}
+  .status.live .dot{background:var(--teal);box-shadow:0 0 0 4px rgba(78,214,196,.18)}
+
+  /* ---------- layout ---------- */
+  .grid{display:grid;grid-template-columns:380px 1fr;gap:26px;margin-top:26px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .card h2{font-size:12px;font-family:var(--mono);letter-spacing:.2em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 16px;font-weight:500}
+
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
+  .field{margin-bottom:16px}
+  input[type=text],input[type=number]{
+    width:100%;font-family:var(--mono);font-size:15px;color:var(--ink);
+    background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 13px;
+    transition:border-color .12s ease,box-shadow .12s ease}
+  input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(78,214,196,.18)}
+  input::placeholder{color:#4b5872}
+  .np{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+  .btns{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+  button.calc{font-family:var(--display);font-size:15px;font-weight:600;cursor:pointer;
+    border:1px solid var(--line);border-radius:11px;padding:13px;background:var(--surface-2);color:var(--ink);
+    transition:transform .12s ease,border-color .12s,background .12s}
+  button.calc:hover{border-color:var(--gold);background:#222d49}
+  button.calc:active{transform:translateY(1px)}
+  button.calc.primary{background:var(--gold);color:#2a1d00;border-color:var(--gold)}
+  button.calc.primary:hover{filter:brightness(1.06)}
+  button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
+
+  .msg{font-family:var(--mono);font-size:12.5px;margin-top:14px;min-height:18px;color:var(--red)}
+  .msg.ok{color:var(--teal)}
+
+  /* ---------- result ---------- */
+  .result{margin-top:22px;padding-top:20px;border-top:1px dashed var(--line)}
+  .result .expr{font-family:var(--mono);font-size:14px;color:var(--muted)}
+  .result .value{font-family:var(--mono);font-weight:700;color:var(--gold);
+    font-size:clamp(30px,7vw,46px);letter-spacing:-.01em;word-break:break-all;line-height:1.1;margin-top:4px}
+  .result .src{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;display:flex;gap:6px;align-items:center}
+
+  /* ---------- pascal ---------- */
+  .pascal-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .pascal-head .hint{font-size:12px;color:var(--muted)}
+  .triangle{margin-top:18px;overflow:auto;padding:8px 2px 4px}
+  .prow{display:flex;justify-content:center;gap:8px;margin-bottom:8px;min-width:max-content}
+  .cell{font-family:var(--mono);font-size:13px;color:var(--ink);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-width:34px;text-align:center;
+    transition:all .18s ease}
+  .cell.edge{color:var(--teal)}
+  .cell.active{background:var(--gold);color:#2a1d00;border-color:var(--gold);font-weight:700;
+    transform:scale(1.12)}
+  .cell.path{border-color:var(--gold);color:var(--gold)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 var(--gold-soft)}70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  .cell.active.pulse{animation:pulse 1.1s ease-out 2}
+  .empty{color:var(--muted);font-size:13px;text-align:center;padding:30px 10px}
+
+  footer{margin-top:34px;font-family:var(--mono);font-size:11.5px;color:var(--muted);
+    border-top:1px solid var(--line);padding-top:16px;line-height:1.7}
+  footer a{color:var(--teal);text-decoration:none}
+  footer a:hover{text-decoration:underline}
+
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <p class="eyebrow">Smart contract · Solidity</p>
+      <h1>Calculadora <b>Binomial</b></h1>
+    </div>
+    <div class="conn">
+      <button class="connect" id="connectBtn">Conectar carteira</button>
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">desconectado</span></div>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ESQUERDA: controles + resultado -->
+    <section class="card">
+      <h2>Entrada</h2>
+
+      <div class="field">
+        <label for="addr">Endereço do contrato (após o deploy)</label>
+        <input id="addr" type="text" placeholder="0x..." spellcheck="false" />
+      </div>
+
+      <div class="np">
+        <div class="field" style="margin-bottom:8px">
+          <label for="n">n</label>
+          <input id="n" type="number" min="0" step="1" placeholder="ex: 5" />
+        </div>
+        <div class="field" style="margin-bottom:8px">
+          <label for="p">p</label>
+          <input id="p" type="number" min="0" step="1" placeholder="ex: 2" />
+        </div>
+      </div>
+
+      <div class="btns">
+        <button class="calc primary" id="btnComb">Calcular C(n, p)</button>
+        <button class="calc" id="btnFat">Calcular fatorial n!</button>
+      </div>
+
+      <div class="msg" id="msg"></div>
+
+      <div class="result" id="result" style="display:none">
+        <div class="expr" id="expr"></div>
+        <div class="value" id="value"></div>
+        <div class="src"><span class="dot" style="background:var(--gold)"></span><span id="src">lido da blockchain</span></div>
+      </div>
+    </section>
+
+    <!-- DIREITA: triângulo de Pascal -->
+    <section class="card">
+      <div class="pascal-head">
+        <h2 style="margin:0">Triângulo de Pascal</h2>
+        <span class="hint">cada casa = soma das duas de cima · C(n,p) acende em <span style="color:var(--gold)">dourado</span></span>
+      </div>
+      <div class="triangle" id="triangle">
+        <div class="empty">Calcule um C(n, p) e a casa correspondente acende aqui.</div>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    Os botões chamam funções <code>pure</code> do contrato — leitura pura, sem gastar gas.<br>
+    Só o <em>deploy</em> do contrato custa taxa (em ETH de teste da rede Sepolia).
+  </footer>
+</div>
+
+<script>
+const ABI = [
+  "function fatorial(uint256 n) pure returns (uint256)",
+  "function combinacao(uint256 n, uint256 p) pure returns (uint256)",
+  "function combinacaoComFatorial(uint256 n, uint256 p) pure returns (uint256)"
+];
+const CHAINS = {11155111:"Sepolia",1:"Ethereum",5:"Goerli",137:"Polygon",31337:"Local"};
+const MAX_ROWS = 24; // limite visual do triângulo
+
+let provider=null, contract=null, account=null;
+
+const $ = id => document.getElementById(id);
+const status=$("status"), statusText=$("statusText"), msg=$("msg");
+
+function setMsg(t,ok=false){ msg.textContent=t; msg.className="msg"+(ok?" ok":""); }
+function shorten(a){ return a.slice(0,6)+"…"+a.slice(-4); }
+
+/* ---------- carteira ---------- */
+async function connect(){
+  if(!window.ethereum){
+    setMsg("MetaMask não detectado. Instale a extensão e recarregue a página.");
+    return;
+  }
+  try{
+    provider = new ethers.BrowserProvider(window.ethereum);
+    const accts = await provider.send("eth_requestAccounts",[]);
+    account = accts[0];
+    const net = await provider.getNetwork();
+    const name = CHAINS[Number(net.chainId)] || ("chain "+net.chainId);
+    status.classList.add("live");
+    statusText.textContent = name+" · "+shorten(account);
+    $("connectBtn").textContent="Conectada";
+    setMsg("Carteira conectada. Cole o endereço do contrato e calcule.",true);
+  }catch(e){
+    setMsg("Conexão recusada na carteira.");
+  }
+}
+if(window.ethereum){
+  window.ethereum.on("accountsChanged",()=>location.reload());
+  window.ethereum.on("chainChanged",()=>location.reload());
+}
+$("connectBtn").addEventListener("click",connect);
+
+/* ---------- validação ---------- */
+function readInt(el,nome){
+  const raw = el.value.trim();
+  if(raw==="") throw new Error("Preencha o campo "+nome+".");
+  if(!/^-?\d+$/.test(raw)) throw new Error(nome+" precisa ser um número inteiro.");
+  const v = Number(raw);
+  if(v<0) throw new Error(nome+" não pode ser negativo.");
+  return v;
+}
+function ensureContract(){
+  const addr=$("addr").value.trim();
+  if(!provider) throw new Error("Conecte a carteira primeiro.");
+  if(!ethers.isAddress(addr)) throw new Error("Endereço do contrato inválido.");
+  contract = new ethers.Contract(addr, ABI, provider);
+}
+
+/* ---------- chamadas on-chain ---------- */
+async function calcCombinacao(){
+  try{
+    setMsg("Lendo da blockchain…");
+    const n=readInt($("n"),"n"), p=readInt($("p"),"p");
+    if(p>n) throw new Error("Entrada incompatível: p não pode ser maior que n.");
+    ensureContract();
+    const r = await contract.combinacao(n,p);
+    showResult("C("+n+", "+p+")", r.toString());
+    drawTriangle(n,p);
+  }catch(e){ handleErr(e); }
+}
+async function calcFatorial(){
+  try{
+    setMsg("Lendo da blockchain…");
+    const n=readInt($("n"),"n");
+    if(n>57) throw new Error("n muito grande: 57! é o máximo que cabe em uint256.");
+    ensureContract();
+    const r = await contract.fatorial(n);
+    showResult(n+"!", r.toString());
+  }catch(e){ handleErr(e); }
+}
+function handleErr(e){
+  const reason = e?.reason || e?.shortMessage || e?.message || "Erro desconhecido.";
+  setMsg(reason);
+}
+$("btnComb").addEventListener("click",calcCombinacao);
+$("btnFat").addEventListener("click",calcFatorial);
+
+/* ---------- resultado ---------- */
+function showResult(expr,val){
+  $("expr").textContent = expr+" =";
+  $("value").textContent = val;
+  $("result").style.display="block";
+  setMsg("Resultado lido do contrato.",true);
+}
+
+/* ---------- triângulo de Pascal ---------- */
+function buildRows(maxRow){
+  const rows=[];
+  for(let r=0;r<=maxRow;r++){
+    const row=[];
+    for(let k=0;k<=r;k++){
+      row.push(k===0||k===r ? 1n : rows[r-1][k-1]+rows[r-1][k]);
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+function drawTriangle(n,p){
+  const box=$("triangle");
+  box.innerHTML="";
+  if(n>MAX_ROWS){
+    box.innerHTML='<div class="empty">Triângulo escondido para n &gt; '+MAX_ROWS+
+      ' (ficaria largo demais). O resultado acima continua vindo da blockchain.</div>';
+    return;
+  }
+  const rows=buildRows(n);
+  rows.forEach((row,r)=>{
+    const div=document.createElement("div");
+    div.className="prow";
+    row.forEach((val,k)=>{
+      const c=document.createElement("div");
+      c.className="cell";
+      if(k===0||k===r) c.classList.add("edge");
+      if(r===n && k===p){ c.classList.add("active","pulse"); c.id="activeCell"; }
+      c.textContent=val.toString();
+      c.title="C("+r+", "+k+")";
+      div.appendChild(c);
+    });
+    box.appendChild(div);
+  });
+  const active=$("activeCell");
+  if(active) active.scrollIntoView({behavior:"smooth",block:"center",inline:"center"});
+}
+</script>
+</body>
+</html>
