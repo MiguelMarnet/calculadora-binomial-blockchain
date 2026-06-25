@@ -63,4 +63,4 @@ As funções do contrato são `pure` (apenas leem e retornam valores), então **
 
 ## 👤 Autor
 
-**Miguel Marnet**
+**Miguel Marnet e David Teixeira**
